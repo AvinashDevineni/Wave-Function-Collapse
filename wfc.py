@@ -59,7 +59,7 @@ class WaveFunctionCollapse:
         if (ROW != 0):
             newOptions: list[Tile] = []
             for option in self.options[ROW - 1][COL]:
-                if (option in self.ruleSet[self.grid[ROW][COL]].up): # type: ignore
+                if (option in self.ruleSet[self.grid[ROW][COL]].getUp() and option in self.options[ROW - 1][COL]): # type: ignore
                     newOptions.append(option)
 
             self.options[ROW - 1][COL] = newOptions
@@ -69,27 +69,27 @@ class WaveFunctionCollapse:
         if (COL != self.gridSize - 1):
             newOptions: list[Tile] = []
             for option in self.options[ROW][COL + 1]:
-                if (option in self.ruleSet[self.grid[ROW][COL]].right): # type: ignore
+                if (option in self.ruleSet[self.grid[ROW][COL]].getRight() and option in self.options[ROW][COL + 1]): # type: ignore
                     newOptions.append(option)
 
             self.options[ROW][COL + 1] = newOptions
             self.entropies[ROW][COL + 1] = len(newOptions)
-
+            
         # handle down
         if (ROW != self.gridSize - 1):
             newOptions: list[Tile] = []
             for option in self.options[ROW + 1][COL]:
-                if (option in self.ruleSet[self.grid[ROW][COL]].down): # type: ignore
+                if (option in self.ruleSet[self.grid[ROW][COL]].getDown() and option in self.options[ROW + 1][COL]): # type: ignore
                     newOptions.append(option)
 
             self.options[ROW + 1][COL] = newOptions
             self.entropies[ROW + 1][COL] = len(newOptions)
-
+        
         # handle left
         if (COL != 0):
             newOptions: list[Tile] = []
             for option in self.options[ROW][COL - 1]:
-                if (option in self.ruleSet[self.grid[ROW][COL]].left): # type: ignore
+                if (option in self.ruleSet[self.grid[ROW][COL]].getLeft() and option in self.options[ROW][COL - 1]): # type: ignore
                     newOptions.append(option)
 
             self.options[ROW][COL - 1] = newOptions

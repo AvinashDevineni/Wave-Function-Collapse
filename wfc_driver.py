@@ -1,10 +1,12 @@
-import pygame
-pygame.init()
+import pygame; pygame.init()
+import sys
 
 import tile
 from wfc import WaveFunctionCollapse
 
-GRID_SIZE = int(input("What size do you want the grid to be?\n"))
+GRID_SIZE: int = int(input("What size do you want the grid to be?\n"))
+DELAY: float = int(input("What delay do you want when generating tiles (ms)?\n"))
+TILE_SET: str = input("What tile set do you want to use (default OR landscape)?\n").strip().lower()
 
 SCREEN_WIDTH: int = 600
 SCREEN_HEIGHT: int = 600
@@ -15,20 +17,23 @@ pygame.display.set_caption('Wave Function Collapse')
 TILE_WIDTH: int = SCREEN_WIDTH // GRID_SIZE
 TILE_HEIGHT: int = SCREEN_HEIGHT // GRID_SIZE
 
-#region Funcs
-def drawRandTiles():
-    for r in range(GRID_SIZE):
-        for c in range(GRID_SIZE):
-            img = tile.TileFactory.createRandTile().img
-            img = pygame.transform.scale(img, (TILE_WIDTH, TILE_HEIGHT))
-            screen.blit(img, (r * TILE_WIDTH, c * TILE_HEIGHT))
-
-    pygame.display.flip()
-#endregion
-
 #region Start
 # drawRandTiles()
-algo = WaveFunctionCollapse(tile.TileFactory.createAll(), tile.TileRuleSetFactory.createAll(), GRID_SIZE)
+tileSet: list[tile.Tile] = []
+tileRules: dict[tile.Tile, tile.TileRuleSet] = {}
+if (TILE_SET == "default"):
+    tileSet = tile.DefaultTileFactory.createAll()
+    tileRules = tile.DefaultTileRuleSetFactory.createAll()
+
+elif (TILE_SET == "landscape"):
+    tileSet = tile.LandscapeTileFactory.createAll()
+    tileRules = tile.LandscapeTileRuleSetFactory.createAll()
+
+else:
+    print("INVALID TILESET PROVIDED.")
+    sys.exit()
+
+algo = WaveFunctionCollapse(tileSet, tileRules, GRID_SIZE)
 #endregion
 
 print("Generating...")
@@ -42,8 +47,7 @@ while running:
         if (event.type == pygame.MOUSEBUTTONDOWN):
             if (isGenerationDone):
                 print("Regenerating...")
-                algo = WaveFunctionCollapse(tile.TileFactory.createAll(),
-                                                tile.TileRuleSetFactory.createAll(), GRID_SIZE)
+                algo = WaveFunctionCollapse(tileSet, tileRules, GRID_SIZE)
                 
                 isGenerationDone = False
                 screen.fill((0, 0, 0))
@@ -57,8 +61,10 @@ while running:
             if (algo.grid[r][c] == None):
                 continue
 
-            screen.blit(pygame.transform.scale(algo.grid[r][c].img, (TILE_WIDTH, TILE_HEIGHT)), # type: ignore
-                        (TILE_WIDTH * c, TILE_HEIGHT * r))
+            screen.blit(pygame.transform.scale(algo.grid[r][c].getImg(), # type: ignore
+            (TILE_WIDTH, TILE_HEIGHT)), (TILE_WIDTH * c, TILE_HEIGHT * r))
     pygame.display.flip()
+
+    pygame.time.wait(DELAY)
 
 pygame.quit()
