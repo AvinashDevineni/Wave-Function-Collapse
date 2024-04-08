@@ -1,5 +1,6 @@
 import pygame; pygame.init()
 import sys
+import time
 
 import tile
 from wfc import WaveFunctionCollapse
@@ -37,8 +38,11 @@ algo = WaveFunctionCollapse(tileSet, tileRules, GRID_SIZE)
 #endregion
 
 print("Generating...")
-running: bool = True
+
 isGenerationDone: bool = False
+genStartTime: float = time.time()
+
+running: bool = True
 while running:
     for event in pygame.event.get():
         if (event.type == pygame.QUIT):
@@ -50,11 +54,19 @@ while running:
                 algo = WaveFunctionCollapse(tileSet, tileRules, GRID_SIZE)
                 
                 isGenerationDone = False
+                genStartTime = time.time()
                 screen.fill((0, 0, 0))
 
-    if (not algo.wfc() and not isGenerationDone):
-        print("Done")
-        isGenerationDone = True
+    result: WaveFunctionCollapse.WFCIterationResult = algo.wfc()
+    if (result == WaveFunctionCollapse.WFCIterationResult.COMPLETE):
+        if (not isGenerationDone):
+            print(f"Done. Generation (and displaying) took {time.time() - genStartTime} seconds.")
+            isGenerationDone = True
+
+    elif (result == WaveFunctionCollapse.WFCIterationResult.CONTRADICTION):
+        print("CONTRADICTION! Restarting WFC.")
+        algo = WaveFunctionCollapse(tileSet, tileRules, GRID_SIZE)
+        screen.fill((0, 0, 0))
     
     for r in range(GRID_SIZE):
         for c in range(GRID_SIZE):

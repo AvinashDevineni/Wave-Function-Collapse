@@ -1,9 +1,15 @@
 import sys
 import random as rand
+from enum import Enum
 
 from tile import Tile, TileRuleSet
 
 class WaveFunctionCollapse:
+    class WFCIterationResult(Enum):
+        COMPLETE = 0,
+        CONTRADICTION = 1,
+        GENERATING = 2
+    
     def __init__(self, startingTiles: list[Tile], rules: dict[Tile, TileRuleSet], gridSize: int) -> None:
         self.possibleTiles: list[Tile] = startingTiles
         self.gridSize: int = gridSize
@@ -25,7 +31,7 @@ class WaveFunctionCollapse:
                 self.options[r].append([])
                 self.options[r][c] = startingTiles.copy()
 
-    def wfc(self) -> bool:
+    def wfc(self) -> WFCIterationResult:
         minEntropy: int = sys.maxsize
         for r in range(self.gridSize):
             for c in range(self.gridSize):
@@ -37,7 +43,7 @@ class WaveFunctionCollapse:
                     minEntropy = entropy
 
         if (minEntropy == sys.maxsize):
-            return False
+            return self.WFCIterationResult.COMPLETE
 
         minEntropyTileIndexes: list[tuple[int, int]] = []
         for r in range(self.gridSize):
@@ -46,11 +52,12 @@ class WaveFunctionCollapse:
                     minEntropyTileIndexes.append((r, c))
 
         chosen: tuple[int, int] = rand.choice(minEntropyTileIndexes)
-        self._collapse(chosen[0], chosen[1])
+        if (not self._collapse(chosen[0], chosen[1])):
+            return self.WFCIterationResult.CONTRADICTION
 
-        return True
+        return self.WFCIterationResult.GENERATING
 
-    def _collapse(self, ROW: int, COL: int) -> None:
+    def _collapse(self, ROW: int, COL: int) -> bool:
         self.grid[ROW][COL] = rand.choice(self.options[ROW][COL])
         self.options[ROW][COL] = []
         self.entropies[ROW][COL] = 0
@@ -62,8 +69,12 @@ class WaveFunctionCollapse:
                 if (option in self.ruleSet[self.grid[ROW][COL]].getUp() and option in self.options[ROW - 1][COL]): # type: ignore
                     newOptions.append(option)
 
+            newEntropy: int = len(newOptions)
+            if (newEntropy == 0 and len(self.options[ROW - 1][COL]) != 0):
+                return False
+
             self.options[ROW - 1][COL] = newOptions
-            self.entropies[ROW - 1][COL] = len(newOptions)
+            self.entropies[ROW - 1][COL] = newEntropy
 
         # handle right
         if (COL != self.gridSize - 1):
@@ -72,8 +83,12 @@ class WaveFunctionCollapse:
                 if (option in self.ruleSet[self.grid[ROW][COL]].getRight() and option in self.options[ROW][COL + 1]): # type: ignore
                     newOptions.append(option)
 
+            newEntropy: int = len(newOptions)
+            if (newEntropy == 0 and len(self.options[ROW][COL + 1]) != 0):
+                return False
+
             self.options[ROW][COL + 1] = newOptions
-            self.entropies[ROW][COL + 1] = len(newOptions)
+            self.entropies[ROW][COL + 1] = newEntropy
             
         # handle down
         if (ROW != self.gridSize - 1):
@@ -82,8 +97,12 @@ class WaveFunctionCollapse:
                 if (option in self.ruleSet[self.grid[ROW][COL]].getDown() and option in self.options[ROW + 1][COL]): # type: ignore
                     newOptions.append(option)
 
+            newEntropy: int = len(newOptions)
+            if (newEntropy == 0 and len(self.options[ROW + 1][COL]) != 0):
+                return False
+
             self.options[ROW + 1][COL] = newOptions
-            self.entropies[ROW + 1][COL] = len(newOptions)
+            self.entropies[ROW + 1][COL] = newEntropy
         
         # handle left
         if (COL != 0):
@@ -92,8 +111,14 @@ class WaveFunctionCollapse:
                 if (option in self.ruleSet[self.grid[ROW][COL]].getLeft() and option in self.options[ROW][COL - 1]): # type: ignore
                     newOptions.append(option)
 
+            newEntropy: int = len(newOptions)
+            if (newEntropy == 0 and len(self.options[ROW][COL - 1]) != 0):
+                return False
+
             self.options[ROW][COL - 1] = newOptions
-            self.entropies[ROW][COL - 1] = len(newOptions)
+            self.entropies[ROW][COL - 1] = newEntropy
+
+        return True
     
     @staticmethod
     def _twoDimToOneDim(row: int, col: int, gridSize: int):
