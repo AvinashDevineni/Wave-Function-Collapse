@@ -29,6 +29,37 @@ class ITilesProvider(abc.ABC):
     def provide() -> list[Tile]:
         ...
 
+class InputTileReader(ITilesProvider):
+    def __init__(self, inputImgPath: str, imgSize: int, regionSize: int, tileSetTileSize: int) -> None:
+        if (regionSize * tileSetTileSize > imgSize): # if region pixel width/height is greater than imgSize
+            raise ValueError("regionSize and tileSetTileSize are too high for imgSize. " +
+                             f"Variables are {regionSize}, {tileSetTileSize}, and {imgSize} respectively.")
+        
+        self.img: pygame.Surface = pygame.image.load(inputImgPath)
+        self.imgSize = imgSize
+        self.regionSize: int = regionSize
+        self.tileSize: int = tileSetTileSize
+
+    def provide(self) -> list[Tile]:
+        regionDisplacement: list[list[tuple[int, int]]] = []
+        for r in range(self.regionSize):
+            rowDisplacement: list[tuple[int, int]] = []
+            for c in range(self.regionSize):
+                rowDisplacement.append((c * self.tileSize, r * self.tileSize))
+            regionDisplacement.append(rowDisplacement)
+        
+        print(regionDisplacement)
+
+        for y in range(self.imgSize):
+            for x in range(self.imgSize):
+                for rowDisplacement in regionDisplacement:
+                    for dis in rowDisplacement:
+                        xDis: int = x + dis[0]
+                        yDis: int = y + dis[1]
+                        print(self.img.get_at((xDis, yDis)))
+
+        return []
+
 DEFAULT_TILES_PATH = './tiles/default/'
 class DefaultTileFactory(ITilesProvider):
     #region Tile IDs
