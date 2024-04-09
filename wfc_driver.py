@@ -3,10 +3,11 @@ import sys
 import time
 
 import tile
+import rules
 from wfc import WaveFunctionCollapse
 
 GRID_SIZE: int = int(input("What size do you want the grid to be?\n"))
-DELAY: float = int(input("What delay do you want when generating tiles (ms)?\n"))
+DELAY: float = int(float(input("What delay do you want when generating tiles (ms)?\n")))
 TILE_SET: str = input("What tile set do you want to use (default OR landscape)?\n").strip().lower()
 
 SCREEN_WIDTH: int = 600
@@ -20,21 +21,21 @@ TILE_HEIGHT: int = SCREEN_HEIGHT // GRID_SIZE
 
 #region Start
 # drawRandTiles()
-tileSet: list[tile.Tile] = []
-tileRules: dict[tile.Tile, tile.TileRuleSet] = {}
+tilesProvider: tile.ITilesProvider
+rulesProvider: rules.IRulesProvider
 if (TILE_SET == "default"):
-    tileSet = tile.DefaultTileFactory.createAll()
-    tileRules = tile.DefaultTileRuleSetFactory.createAll()
+    tilesProvider = tile.DefaultTileFactory()
+    rulesProvider = rules.DefaultTileRuleSetFactory()
 
 elif (TILE_SET == "landscape"):
-    tileSet = tile.LandscapeTileFactory.createAll()
-    tileRules = tile.LandscapeTileRuleSetFactory.createAll()
+    tilesProvider = tile.LandscapeTileFactory()
+    rulesProvider = rules.LandscapeTileRuleSetFactory()
 
 else:
     print("INVALID TILESET PROVIDED.")
     sys.exit()
 
-algo = WaveFunctionCollapse(tileSet, tileRules, GRID_SIZE)
+algo = WaveFunctionCollapse(tilesProvider, rulesProvider, GRID_SIZE)
 #endregion
 
 print("Generating...")
@@ -51,7 +52,7 @@ while running:
         if (event.type == pygame.MOUSEBUTTONDOWN):
             if (isGenerationDone):
                 print("Regenerating...")
-                algo = WaveFunctionCollapse(tileSet, tileRules, GRID_SIZE)
+                algo = WaveFunctionCollapse(tilesProvider, rulesProvider, GRID_SIZE)
                 
                 isGenerationDone = False
                 genStartTime = time.time()
@@ -65,7 +66,7 @@ while running:
 
     elif (result == WaveFunctionCollapse.WFCIterationResult.CONTRADICTION):
         print("CONTRADICTION! Restarting WFC.")
-        algo = WaveFunctionCollapse(tileSet, tileRules, GRID_SIZE)
+        algo = WaveFunctionCollapse(tilesProvider, rulesProvider, GRID_SIZE)
         screen.fill((0, 0, 0))
     
     for r in range(GRID_SIZE):

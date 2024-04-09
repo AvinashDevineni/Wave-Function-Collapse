@@ -2,7 +2,8 @@ import sys
 import random as rand
 from enum import Enum
 
-from tile import Tile, TileRuleSet
+from tile import Tile, ITilesProvider
+from rules import TileRuleSet, IRulesProvider
 
 class WaveFunctionCollapse:
     class WFCIterationResult(Enum):
@@ -10,10 +11,11 @@ class WaveFunctionCollapse:
         CONTRADICTION = 1,
         GENERATING = 2
     
-    def __init__(self, startingTiles: list[Tile], rules: dict[Tile, TileRuleSet], gridSize: int) -> None:
-        self.possibleTiles: list[Tile] = startingTiles
+    def __init__(self, tilesProvider: ITilesProvider, rulesProvider: IRulesProvider,
+    gridSize: int, seed: int | None = None) -> None:
+        self.possibleTiles: list[Tile] = tilesProvider.provide()
         self.gridSize: int = gridSize
-        self.ruleSet: dict[Tile, TileRuleSet] = rules
+        self.ruleSet: dict[Tile, TileRuleSet] = rulesProvider.provide()
 
         self.grid: list[list[Tile | None]] = []
         self.entropies: list[list[int]] = []
@@ -26,10 +28,12 @@ class WaveFunctionCollapse:
             for c in range(gridSize):
                 self.grid[r].append(None)
 
-                self.entropies[r].append(len(startingTiles))
+                self.entropies[r].append(len(self.possibleTiles))
 
                 self.options[r].append([])
-                self.options[r][c] = startingTiles.copy()
+                self.options[r][c] = self.possibleTiles.copy()
+
+        self.rand = rand.Random(seed)
 
     def wfc(self) -> WFCIterationResult:
         minEntropy: int = sys.maxsize
@@ -51,14 +55,14 @@ class WaveFunctionCollapse:
                 if (self.entropies[r][c] == minEntropy):
                     minEntropyTileIndexes.append((r, c))
 
-        chosen: tuple[int, int] = rand.choice(minEntropyTileIndexes)
+        chosen: tuple[int, int] = self.rand.choice(minEntropyTileIndexes)
         if (not self._collapse(chosen[0], chosen[1])):
             return self.WFCIterationResult.CONTRADICTION
 
         return self.WFCIterationResult.GENERATING
 
     def _collapse(self, ROW: int, COL: int) -> bool:
-        self.grid[ROW][COL] = rand.choice(self.options[ROW][COL])
+        self.grid[ROW][COL] = self.rand.choice(self.options[ROW][COL])
         self.options[ROW][COL] = []
         self.entropies[ROW][COL] = 0
 
