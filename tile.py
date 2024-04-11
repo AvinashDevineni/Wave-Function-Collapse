@@ -1,64 +1,87 @@
 import pygame
 import abc
 
+import utils
+
 class Tile:
-    def __init__(self, imgPath: str) -> None:
-        self._img: pygame.Surface = pygame.image.load(imgPath)
-        self._imgPath = imgPath
+    def __init__(self, imgPath: str | None = None, surface: pygame.Surface | None = None) -> None:
+        self._imgPath: str | None = None
+
+        if (imgPath == None and surface == None):
+            raise ValueError("Both imgPath and surface cannot be None. One must be provided.")
+        
+        if (imgPath != None and surface != None):
+            raise ValueError("Both imgPath and surface cannot be provided. Only one must be provided.")
+        
+        if (imgPath != None):
+            self._img: pygame.Surface = pygame.image.load(imgPath)
+            self._imgPath = imgPath
+
+        if (surface != None):
+            self._img: pygame.Surface = surface
 
     def getImg(self) -> pygame.Surface:
         return self._img
 
     def __eq__(self, compare: object) -> bool:
-        if (type(compare) != Tile):
-            return False
-        
-        return self._imgPath == compare._imgPath
+        # __eq__ should only get called when hash codes are equal in dict, so it should be true
+        return True 
     
     def __hash__(self) -> int:
-        return self._imgPath.__hash__()
+        if (self._imgPath is not None):
+            return self._imgPath.__hash__()
+        
+        else:
+            return utils.getSurfaceHash(self._img)
     
     def __str__(self) -> str:
-        return self._imgPath
+        if (self._imgPath is not None):
+            return self._imgPath
+        
+        return "None"
     
     def __repr__(self) -> str:
         return self.__str__()
 
 class ITilesProvider(abc.ABC):
     @abc.abstractmethod
-    def provide() -> list[Tile]:
+    def provide() -> dict[Tile, float]:
+        '''Returns a dictionary that represents a tiles' chance to spawn, a fliat from 0-1. The sum of values should approximately 1.'''
         ...
 
 class InputTileReader(ITilesProvider):
-    def __init__(self, inputImgPath: str, imgSize: int, regionSize: int, tileSetTileSize: int) -> None:
-        if (regionSize * tileSetTileSize > imgSize): # if region pixel width/height is greater than imgSize
+    def __init__(self, sampleImgPath: str, regionSize: int, tileSetTileSize: int) -> None:
+        self.sample: pygame.Surface = pygame.image.load(sampleImgPath)
+        self.imgSize = self.sample.get_width()
+        if (regionSize * tileSetTileSize > self.imgSize): # if region pixel width/height is greater than imgSize
             raise ValueError("regionSize and tileSetTileSize are too high for imgSize. " +
-                             f"Variables are {regionSize}, {tileSetTileSize}, and {imgSize} respectively.")
+                             f"Variables are {regionSize}, {tileSetTileSize}, and {self.imgSize} respectively.")
         
-        self.img: pygame.Surface = pygame.image.load(inputImgPath)
-        self.imgSize = imgSize
         self.regionSize: int = regionSize
         self.tileSize: int = tileSetTileSize
 
-    def provide(self) -> list[Tile]:
+    def provide(self) -> dict[Tile, float]:
         regionDisplacement: list[list[tuple[int, int]]] = []
         for r in range(self.regionSize):
             rowDisplacement: list[tuple[int, int]] = []
             for c in range(self.regionSize):
                 rowDisplacement.append((c * self.tileSize, r * self.tileSize))
             regionDisplacement.append(rowDisplacement)
+
+        regions: list[Tile] = []
+        for regionTopRow in range(self.imgSize - (self.regionSize - 1)):
+            for regionLeftCol in range(self.imgSize - (self.regionSize - 1)):
+                regions.append(Tile(surface=self.sample.subsurface
+                ((regionLeftCol, regionTopRow), (self.regionSize, self.regionSize))))
         
-        print(regionDisplacement)
-
-        for y in range(self.imgSize):
-            for x in range(self.imgSize):
-                for rowDisplacement in regionDisplacement:
-                    for dis in rowDisplacement:
-                        xDis: int = x + dis[0]
-                        yDis: int = y + dis[1]
-                        print(self.img.get_at((xDis, yDis)))
-
-        return []
+        regionsDict: dict[Tile, float] = {}
+        numRegions: int = len(regions)
+        for region in regions:
+            regionsDict[region] = regionsDict.get(region, 0) + 1
+        for region in regionsDict:
+            regionsDict[region] = regionsDict[region] / numRegions
+        
+        return regionsDict
 
 DEFAULT_TILES_PATH = './tiles/default/'
 class DefaultTileFactory(ITilesProvider):
@@ -73,14 +96,15 @@ class DefaultTileFactory(ITilesProvider):
     # for flyweight pattern
     _createdTiles: dict[int, Tile] = {}
 
-    def provide(self) -> list[Tile]:
-        tiles: list[Tile] = []
+    def provide(self) -> dict[Tile, float]:
+        tiles: dict[Tile, float] = {}
 
-        tiles.append(DefaultTileFactory.createBlank())
-        tiles.append(DefaultTileFactory.createUp())
-        tiles.append(DefaultTileFactory.createRight())
-        tiles.append(DefaultTileFactory.createDown())
-        tiles.append(DefaultTileFactory.createLeft())
+        numTiles: int = 5
+        tiles[DefaultTileFactory.createBlank()] = 1/numTiles
+        tiles[DefaultTileFactory.createUp()] = 1/numTiles
+        tiles[DefaultTileFactory.createRight()] = 1/numTiles
+        tiles[DefaultTileFactory.createDown()] = 1/numTiles
+        tiles[DefaultTileFactory.createLeft()] = 1/numTiles
 
         return tiles
 
@@ -128,17 +152,18 @@ class LandscapeTileFactory(ITilesProvider):
     # for flyweight pattern
     _createdTiles: dict[int, Tile] = {}
 
-    def provide(self) -> list[Tile]:
-        tiles: list[Tile] = []
+    def provide(self) -> dict[Tile, float]:
+        tiles: dict[Tile, float] = {}
 
-        tiles.append(LandscapeTileFactory.createGrass1())
-        tiles.append(LandscapeTileFactory.createGrass2())
-        tiles.append(LandscapeTileFactory.createFlower1())
-        tiles.append(LandscapeTileFactory.createFlower2())
-        tiles.append(LandscapeTileFactory.createLightForest1())
-        tiles.append(LandscapeTileFactory.createLightForest2())
-        tiles.append(LandscapeTileFactory.createWater1())
-        tiles.append(LandscapeTileFactory.createWater2())
+        numTiles: int = 8
+        tiles[LandscapeTileFactory.createGrass1()] = 1/numTiles
+        tiles[LandscapeTileFactory.createGrass2()] = 1/numTiles
+        tiles[LandscapeTileFactory.createFlower1()] = 1/numTiles
+        tiles[LandscapeTileFactory.createFlower2()] = 1/numTiles
+        tiles[LandscapeTileFactory.createLightForest1()] = 1/numTiles
+        tiles[LandscapeTileFactory.createLightForest2()] = 1/numTiles
+        tiles[LandscapeTileFactory.createWater1()] = 1/numTiles
+        tiles[LandscapeTileFactory.createWater2()] = 1/numTiles
 
         return tiles
 

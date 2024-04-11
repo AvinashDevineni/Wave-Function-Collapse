@@ -4,6 +4,7 @@ from enum import Enum
 
 from tile import Tile, ITilesProvider
 from rules import TileRuleSet, IRulesProvider
+from utils import Direction
 
 class WaveFunctionCollapse:
     class WFCIterationResult(Enum):
@@ -12,14 +13,15 @@ class WaveFunctionCollapse:
         GENERATING = 2
     
     def __init__(self, tilesProvider: ITilesProvider, rulesProvider: IRulesProvider,
-    gridSize: int, seed: int | None = None) -> None:
-        self.possibleTiles: list[Tile] = tilesProvider.provide()
+    gridSize: int, seed: int | None = None, areTilesWeighted: bool = False) -> None:
+        self.areTilesWeighted = areTilesWeighted
+        self.possibleTiles: dict[Tile, float] = tilesProvider.provide()
         self.gridSize: int = gridSize
         self.ruleSet: dict[Tile, TileRuleSet] = rulesProvider.provide()
 
         self.grid: list[list[Tile | None]] = []
         self.entropies: list[list[int]] = []
-        self.options: list[list[list[Tile]]] = []
+        self.options: list[list[dict[Tile, float]]] = []
         for r in range (gridSize):
             self.grid.append([])
             self.entropies.append([])
@@ -27,11 +29,8 @@ class WaveFunctionCollapse:
 
             for c in range(gridSize):
                 self.grid[r].append(None)
-
                 self.entropies[r].append(len(self.possibleTiles))
-
-                self.options[r].append([])
-                self.options[r][c] = self.possibleTiles.copy()
+                self.options[r].append(self.possibleTiles.copy())
 
         self.rand = rand.Random(seed)
 
@@ -62,65 +61,72 @@ class WaveFunctionCollapse:
         return self.WFCIterationResult.GENERATING
 
     def _collapse(self, ROW: int, COL: int) -> bool:
-        self.grid[ROW][COL] = self.rand.choice(self.options[ROW][COL])
-        self.options[ROW][COL] = []
+        selfOptions: dict[Tile, float] = self.options[ROW][COL]
+        if (self.areTilesWeighted):
+            randVal: float = rand.random()
+            chanceSum: float = 0
+            for option in selfOptions:
+                chanceSum += selfOptions[option]
+                if (randVal < chanceSum):
+                    self.grid[ROW][COL] = option
+                    break
+
+
+        else:
+            tileOptions: list[Tile] = []
+            for option in selfOptions:
+                tileOptions.append(option)
+            
+            self.grid[ROW][COL] = self.rand.choice(tileOptions)
+        
+        self.options[ROW][COL] = {}
         self.entropies[ROW][COL] = 0
 
-        # handle up
-        if (ROW != 0):
-            newOptions: list[Tile] = []
-            for option in self.options[ROW - 1][COL]:
-                if (option in self.ruleSet[self.grid[ROW][COL]].getUp() and option in self.options[ROW - 1][COL]): # type: ignore
-                    newOptions.append(option)
+        for dir in Direction:
+            deltaRow: int = 0
+            deltaCol: int = 0
+            possibleTileSet: set[Tile]
+            if (dir == Direction.RIGHT):
+                deltaCol = 1
+                possibleTileSet = self.ruleSet[self.grid[ROW][COL]].getRight() # type: ignore
 
-            newEntropy: int = len(newOptions)
-            if (newEntropy == 0 and len(self.options[ROW - 1][COL]) != 0):
-                return False
+            elif (dir == Direction.LEFT):
+                deltaCol = -1
+                possibleTileSet = self.ruleSet[self.grid[ROW][COL]].getLeft() # type: ignore
 
-            self.options[ROW - 1][COL] = newOptions
-            self.entropies[ROW - 1][COL] = newEntropy
+            elif (dir == Direction.UP):
+                deltaRow = -1
+                possibleTileSet = self.ruleSet[self.grid[ROW][COL]].getUp() # type: ignore
 
-        # handle right
-        if (COL != self.gridSize - 1):
-            newOptions: list[Tile] = []
-            for option in self.options[ROW][COL + 1]:
-                if (option in self.ruleSet[self.grid[ROW][COL]].getRight() and option in self.options[ROW][COL + 1]): # type: ignore
-                    newOptions.append(option)
-
-            newEntropy: int = len(newOptions)
-            if (newEntropy == 0 and len(self.options[ROW][COL + 1]) != 0):
-                return False
-
-            self.options[ROW][COL + 1] = newOptions
-            self.entropies[ROW][COL + 1] = newEntropy
+            else:
+                deltaRow = 1
+                possibleTileSet = self.ruleSet[self.grid[ROW][COL]].getDown() # type: ignore
             
-        # handle down
-        if (ROW != self.gridSize - 1):
-            newOptions: list[Tile] = []
-            for option in self.options[ROW + 1][COL]:
-                if (option in self.ruleSet[self.grid[ROW][COL]].getDown() and option in self.options[ROW + 1][COL]): # type: ignore
-                    newOptions.append(option)
+            if (ROW + deltaRow == -1 or ROW + deltaRow == self.gridSize):
+                continue
+
+            if (COL + deltaCol == -1 or COL + deltaCol == self.gridSize):
+                continue
+
+            newOptions: dict[Tile, float] = {}
+            chanceSum: float = 0
+            for option in self.options[ROW + deltaRow][COL + deltaCol]:
+                if (option in possibleTileSet):
+                    chance: float = self.options[ROW + deltaRow][COL + deltaCol][option]
+                    newOptions[option] = chance
+                    chanceSum += chance
 
             newEntropy: int = len(newOptions)
-            if (newEntropy == 0 and len(self.options[ROW + 1][COL]) != 0):
+            if (newEntropy == 0 and len(self.options[ROW + deltaRow][COL + deltaCol]) != 0):
                 return False
+            
+            if (self.areTilesWeighted):
+                chanceMultiplier: float = 1 / chanceSum
+                for option in newOptions:
+                    newOptions[option] = newOptions[option] * chanceMultiplier
 
-            self.options[ROW + 1][COL] = newOptions
-            self.entropies[ROW + 1][COL] = newEntropy
-        
-        # handle left
-        if (COL != 0):
-            newOptions: list[Tile] = []
-            for option in self.options[ROW][COL - 1]:
-                if (option in self.ruleSet[self.grid[ROW][COL]].getLeft() and option in self.options[ROW][COL - 1]): # type: ignore
-                    newOptions.append(option)
-
-            newEntropy: int = len(newOptions)
-            if (newEntropy == 0 and len(self.options[ROW][COL - 1]) != 0):
-                return False
-
-            self.options[ROW][COL - 1] = newOptions
-            self.entropies[ROW][COL - 1] = newEntropy
+            self.options[ROW + deltaRow][COL + deltaCol] = newOptions
+            self.entropies[ROW + deltaRow][COL + deltaCol] = newEntropy
 
         return True
     

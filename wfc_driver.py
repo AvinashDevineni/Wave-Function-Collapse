@@ -71,7 +71,7 @@ while running:
     
     for r in range(GRID_SIZE):
         for c in range(GRID_SIZE):
-            if (algo.grid[r][c] == None):
+            if (algo.grid[r][c] is None):
                 continue
 
             screen.blit(pygame.transform.scale(algo.grid[r][c].getImg(), # type: ignore
